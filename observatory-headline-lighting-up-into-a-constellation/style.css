@@ -1,0 +1,314 @@
+/*
+  "The observatory headline that lights up into a constellation of stars on scroll" from Animorio · https://animorio.com
+  License: free on your own sites and your clients’ sites, paid work included.
+  Not for resale, redistribution, templates or code collections · https://animorio.com/en/license/
+*/
+/* The observatory headline that lights up into a constellation
+   The sky is a canvas drawn by the script every frame; the letters, the constellation lines (an SVG over the
+   headline) and the card are moved by the script. GSAP writes the transforms on .copy, .card and their parts: the
+   centring is done with flex, never with a transform in this file. */
+
+:root {
+  --night: #04060d;       /* the top of the sky */
+  --night-low: #0b1424;   /* the sky near the horizon */
+  --star: #f6f1e6;        /* a lit letter */
+  --unlit: rgba(196, 208, 236, 0.17); /* a letter still dark */
+  --line: #c9d7ff;        /* the constellation line */
+  --accent: #e8c98e;      /* Saturn's sand, the one accent */
+  --ink: #e9edf6;         /* interface text */
+  --muted: rgba(220, 228, 245, 0.56);
+  --glass: rgba(150, 170, 215, 0.10);
+  --edge: rgba(220, 230, 255, 0.16);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { background: var(--night); }
+body {
+  background: var(--night);
+  color: var(--ink);
+  font-family: 'Mona Sans Variable', 'Mona Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; text-decoration: none; }
+ul { list-style: none; }
+
+.hero { position: relative; height: 380vh; }
+.stage {
+  --g: clamp(16px, 3.4vw, 44px);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+  isolation: isolate;
+  background: radial-gradient(140% 90% at 70% 0%, #070b16, var(--night) 60%);
+}
+@supports (height: 100lvh) {
+  .stage { height: 100lvh; }
+}
+
+/* the photographed sky */
+.sky { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: -3; opacity: 0; }
+.grain {
+  position: absolute;
+  inset: -40px;
+  z-index: -2;
+  pointer-events: none;
+  opacity: 0.09;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain 0.9s steps(6) infinite;
+}
+@keyframes grain {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-23px, 11px); }
+  40% { transform: translate(14px, -19px); }
+  60% { transform: translate(-9px, -27px); }
+  80% { transform: translate(21px, 17px); }
+  100% { transform: translate(0, 0); }
+}
+.vignette {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 95% at 50% 46%, transparent 52%, rgba(1, 2, 6, 0.62) 100%),
+    linear-gradient(to bottom, rgba(2, 3, 8, 0.4), transparent 22%);
+}
+
+/* the marker around the pole star: a hairline ring and its name, placed by the script */
+.polaris {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  pointer-events: none;
+  opacity: 0;
+}
+.polaris__ring { width: 40px; height: 40px; display: block; fill: none; stroke: rgba(210, 222, 255, 0.34); stroke-width: 0.75; stroke-dasharray: 2 3.4; }
+.polaris__name {
+  position: absolute;
+  left: 44px;
+  top: 13px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-variation-settings: 'wdth' 110;
+  color: rgba(214, 224, 248, 0.5);
+  white-space: nowrap;
+}
+
+/* the nav */
+.nav {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: clamp(52px, 10vh, 80px);
+  padding: 0 var(--g);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 14px;
+  z-index: 3;
+}
+.brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 600; font-variation-settings: 'wdth' 108; letter-spacing: 0.01em; }
+.brand__mark { width: 22px; height: 22px; fill: none; stroke: var(--ink); stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+.nav__links { display: flex; gap: clamp(18px, 2.6vw, 34px); color: var(--muted); }
+.nav__links a { transition: color 0.3s ease, font-variation-settings 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); font-variation-settings: 'wdth' 100; }
+.pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-weight: 560;
+  font-size: 13px;
+  font-variation-settings: 'wdth' 100;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.05));
+  box-shadow: inset 0 0 0 1px var(--edge), inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 6px 18px rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  transition: font-variation-settings 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+}
+.pill span { display: inline-block; transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.pill:active span { transform: scale(0.94); }
+@media (hover: hover) {
+  .nav__links a:hover { color: var(--ink); font-variation-settings: 'wdth' 116; }
+  .pill:hover { font-variation-settings: 'wdth' 118; box-shadow: inset 0 0 0 1px rgba(232, 201, 142, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 8px 26px rgba(232, 201, 142, 0.16); }
+}
+
+/* the headline */
+.copy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 var(--g) 6vh;
+  pointer-events: none;
+  z-index: 2;
+}
+.eyebrow {
+  font-size: clamp(10px, 1.6vh, 12px);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-variation-settings: 'wdth' 118;
+  color: var(--muted);
+  margin-bottom: clamp(10px, 2.6vh, 24px);
+}
+.title {
+  font-family: 'Fraunces Variable', 'Fraunces', Georgia, serif;
+  font-weight: 300;
+  font-size: min(10.6vw, 13vh, 132px);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  color: var(--unlit);
+  font-variation-settings: 'opsz' 144;
+}
+.title__line { display: block; white-space: nowrap; }
+.ch { display: inline-block; will-change: transform, opacity; }
+.sp { display: inline-block; width: 0.26em; }
+.lede {
+  margin-top: clamp(10px, 2.6vh, 26px);
+  max-width: 34ch;
+  font-size: clamp(13px, 2vh, 16px);
+  line-height: 1.5;
+  color: var(--muted);
+}
+.links { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.links line { stroke: var(--line); stroke-width: 0.9; stroke-linecap: round; fill: none; }
+.links .node path { fill: #fffaf0; }
+
+/* the scroll hint */
+.hint {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(14px, 4vh, 34px);
+  margin-left: -100px;
+  width: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  z-index: 2;
+}
+.hint > * { opacity: var(--fade, 1); }
+.hint__arrow { width: 10px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+
+/* the glass card */
+.dock {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--g) clamp(12px, 4.5vh, 44px);
+  z-index: 4;
+  pointer-events: none;
+}
+.card {
+  --mx: 30%;
+  --my: 0%;
+  position: relative;
+  width: min(680px, 100%);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'main chart' 'stats chart';
+  column-gap: clamp(16px, 3vw, 30px);
+  row-gap: clamp(8px, 1.8vh, 16px);
+  padding: clamp(12px, 2.6vh, 22px) clamp(14px, 2.6vw, 24px);
+  border-radius: clamp(16px, 2.6vh, 24px);
+  background:
+    radial-gradient(70% 120% at var(--mx) var(--my), rgba(214, 226, 255, 0.12), transparent 60%),
+    linear-gradient(160deg, rgba(160, 180, 225, 0.16), rgba(70, 85, 120, 0.08) 60%, rgba(30, 38, 60, 0.18));
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow:
+    inset 0 0 0 1px var(--edge),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+    0 2px 6px rgba(0, 0, 0, 0.25),
+    0 24px 60px -12px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  pointer-events: auto;
+  opacity: 0;
+}
+.card__sheen {
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 38%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.10) 45%, rgba(255, 255, 255, 0.02) 60%, transparent);
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+.card__main { grid-area: main; display: flex; align-items: center; gap: clamp(10px, 1.6vw, 16px); min-width: 0; }
+.planet { flex: none; width: clamp(38px, 7vh, 52px); height: clamp(38px, 7vh, 52px); filter: drop-shadow(0 4px 10px rgba(232, 201, 142, 0.18)); }
+.card__text { min-width: 0; text-align: left; }
+.card__label {
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-variation-settings: 'wdth' 112;
+  color: var(--accent);
+  opacity: 0.9;
+}
+.card__title {
+  margin-top: 3px;
+  font-family: 'Fraunces Variable', 'Fraunces', Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(20px, 4.4vh, 34px);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  font-variation-settings: 'opsz' 72;
+}
+.card__comma { color: var(--muted); }
+.card__time { font-family: 'Mona Sans Variable', 'Mona Sans', system-ui, sans-serif; font-weight: 500; font-size: 0.78em; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; font-variation-settings: 'wdth' 92; }
+.card__meta { margin-top: 4px; font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stats { grid-area: stats; display: flex; gap: clamp(14px, 3vw, 30px); }
+.stats li { display: flex; flex-direction: column; gap: 2px; text-align: left; }
+.stats span { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-variation-settings: 'wdth' 108; }
+.stats b { font-size: 14px; font-weight: 560; font-variant-numeric: tabular-nums; }
+.chart { grid-area: chart; align-self: center; width: clamp(150px, 26vw, 220px); height: auto; overflow: visible; }
+.chart__horizon { stroke: rgba(214, 226, 255, 0.22); stroke-width: 1; }
+.chart__arc { fill: none; stroke: rgba(222, 232, 255, 0.75); stroke-width: 1.2; stroke-linecap: round; }
+.chart__now { stroke: rgba(232, 201, 142, 0.5); stroke-width: 1; stroke-dasharray: 2 3; }
+.chart__mark-halo { fill: rgba(232, 201, 142, 0.16); stroke: rgba(232, 201, 142, 0.55); stroke-width: 0.8; }
+.chart__mark-dot { fill: var(--accent); }
+.chart__tick { font-size: 9.5px; fill: var(--muted); font-family: 'Mona Sans Variable', 'Mona Sans', system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.chart__tick--now { fill: var(--accent); }
+
+/* narrow screens: the nav keeps the brand and the pill, the card drops the chart */
+@media (max-width: 700px) {
+  .nav__links { display: none; }
+  .card { grid-template-columns: 1fr; grid-template-areas: 'main' 'stats'; }
+  .chart { display: none; }
+  .card__meta { white-space: normal; }
+}
+@media (max-width: 420px) {
+  .pill { height: 32px; padding: 0 13px; font-size: 12px; }
+  .polaris__name { display: none; }
+}
+/* short screens, like the preview box of a phone */
+@media (max-height: 560px) {
+  .lede { display: none; }
+  .card__meta { display: none; }
+  .hint { display: none; }
+}
+@media (max-height: 440px) {
+  .eyebrow { margin-bottom: 8px; }
+  .stats b { font-size: 13px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grain { animation: none; }
+}
